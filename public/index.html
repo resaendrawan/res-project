@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>To-Do List Node.js</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-neutral-950 text-white font-sans">
+
+  <div class="container mx-auto mt-10 p-6 max-w-screen-xl">
+
+    <!-- Title -->
+    <h1 class="text-4xl font-bold text-center mb-6 text-gray-100">List Project</h1>
+
+    <!-- Add Button -->
+    <button id="addButton" class="px-6 py-2 bg-neutral-900 text-white rounded-lg hover:bg-green-700 transition duration-300 mb-6 block mx-auto">
+      Add Task
+    </button>
+
+    <!-- Form Input -->
+    <div id="formContainer" class="bg-neutral-950 border border-1 border-gray-800 p-6 rounded-lg shadow-lg mb-6 hidden max-w-full">
+      <h2 class="text-xl font-semibold mb-4 text-gray-300">Add/Edit Task</h2>
+      <form id="taskForm">
+        <input type="hidden" id="taskId" />
+        
+        <!-- Status Dropdown -->
+        <div class="mb-4">
+          <label for="status" class="block text-sm font-medium border-1 border-gray-900 text-gray-300">Status</label>
+          <select id="status" class="block w-full mt-1 p-2 bg-neutral-950 border border-1 text-gray-100 border-gray-800 rounded-lg">
+            <option value="not_started">Not Started</option>
+            <option value="in_progress">In Progress</option>
+            <option value="eligible">Eligible</option>
+            <option value="not_eligible">Not Eligible</option>
+          </select>
+        </div>
+
+        <!-- Project Name -->
+        <div class="mb-4">
+          <label for="projectName" class="block text-sm font-medium text-gray-300">Project Name</label>
+          <input type="text" id="projectName" class="block w-full mt-1 p-2 bg-neutral-950 text-gray-100 border border-gray-800 rounded-lg" placeholder="Enter project name" />
+        </div>
+
+        <!-- Project Description -->
+        <div class="mb-4">
+          <label for="projectDescription" class="block text-sm font-medium text-gray-300">Project Description</label>
+          <textarea id="projectDescription" class="block w-full mt-1 p-2 bg-neutral-950 text-gray-100 border border-gray-800 rounded-lg" rows="4" placeholder="Enter project description"></textarea>
+        </div>
+
+        <button type="submit" class="px-6 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition duration-300">Save Task</button>
+      </form>
+    </div>
+
+    <!-- Task Section -->
+    <div id="taskList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
+      <!-- Rows will be populated here -->
+    </div>
+  </div>
+
+  <script>
+    const taskListContainer = document.getElementById('taskList');
+    const taskForm = document.getElementById('taskForm');
+    const taskIdField = document.getElementById('taskId');
+    const projectNameField = document.getElementById('projectName');
+    const projectDescriptionField = document.getElementById('projectDescription');
+    const statusField = document.getElementById('status');
+    const formContainer = document.getElementById('formContainer');
+    const addButton = document.getElementById('addButton');
+
+    // Show form when Add button is clicked
+    addButton.addEventListener('click', () => {
+      formContainer.classList.toggle('hidden'); // Toggle visibility of form
+      addButton.classList.add('hidden'); // Hide Add button after clicking
+    });
+
+    // Copy project name or description to clipboard
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Text copied to clipboard!');
+      }).catch((err) => {
+        alert('Failed to copy text: ' + err);
+      });
+    }
+
+    // Fetch and display tasks
+    async function fetchTasks() {
+      const res = await fetch('/tasks');
+      const tasks = await res.json();
+      taskListContainer.innerHTML = '';
+      tasks.forEach(task => {
+        const taskCard = document.createElement('section');
+        taskCard.classList.add('bg-neutral-950', 'rounded-lg', 'shadow-lg', 'p-6', 'hover:bg-neutral-950', 'border', 'border-1', 'border-gray-800', 'transition', 'duration-300');
+        
+        // Format the date to display only the date without the time
+        const formattedDate = new Date(task.dateAdded).toLocaleDateString('id-ID'); // Format to 'dd/mm/yyyy'
+
+        taskCard.innerHTML = `
+          <div class="flex justify-between items-center mb-4">
+            <span class="text-gray-500 text-sm font-medium">${task.status.replace('_', ' ').toUpperCase()}</span>
+            <span class="text-gray-400 text-sm">${formattedDate}</span>
+          </div>
+          <div class="mb-4 cursor-pointer" onclick="copyToClipboard('${task.name}')">
+            <h3 class="text-xl font-semibold text-gray-200">${task.name}</h3>
+          </div>
+          <div class="mb-4 cursor-pointer" onclick="copyToClipboard('${task.description}')">
+            <p class="text-sm text-gray-400">${task.description}</p>
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button onclick="editTask(${task.id})" class="text-white border-1 rounded-md px-4 py-2 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-800">
+              Edit
+            </button>
+            <button onclick="deleteTask(${task.id})" class="text-white border-1 rounded-md px-4 py-2 bg-red-700 hover:bg-red-800">
+              Delete
+            </button>
+          </div>
+        `;
+        taskListContainer.appendChild(taskCard);
+      });
+    }
+
+    // Add or Edit task
+    taskForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const newTask = {
+        status: statusField.value,
+        name: projectNameField.value,
+        description: projectDescriptionField.value,
+        dateAdded: new Date().toLocaleString() // Add current date and time
+      };
+
+      if (taskIdField.value) {
+        // Editing an existing task
+        const taskId = taskIdField.value;
+        await fetch(`/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newTask),
+        });
+        taskIdField.value = '';  // Clear the task ID
+      } else {
+        // Adding a new task
+        await fetch('/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newTask),
+        });
+      }
+
+      fetchTasks();  // Refresh task list
+      taskForm.reset();  // Clear form
+      formContainer.classList.add('hidden'); // Hide form after submission
+      addButton.classList.remove('hidden'); // Show Add button again
+    });
+
+    // Edit task
+    function editTask(id) {
+      fetch(`/tasks/${id}`)
+        .then(res => res.json())
+        .then(task => {
+          taskIdField.value = task.id;
+          projectNameField.value = task.name;
+          projectDescriptionField.value = task.description;
+          statusField.value = task.status;
+          formContainer.classList.remove('hidden');
+          addButton.classList.add('hidden');
+        });
+    }
+
+    // Delete task
+    async function deleteTask(id) {
+      await fetch(`/tasks/${id}`, { method: 'DELETE' });
+      fetchTasks();  // Refresh task list
+    }
+
+    // Initialize app
+    fetchTasks();
+  </script>
+</body>
+</html>
